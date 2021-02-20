@@ -1,6 +1,28 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <time.h>
+
+#define BILLION 1000000000L;
+
+// struct timespec start_time;
+struct timespec stop_time;
+
+double calculateExecutionTime(struct timespec start_time)
+{
+
+    clock_gettime(CLOCK_MONOTONIC, &stop_time);
+
+    double dSeconds = (stop_time.tv_sec - start_time.tv_sec);
+
+    double dNanoSeconds = (double)(stop_time.tv_nsec - start_time.tv_nsec) / BILLION;
+
+    return dSeconds + dNanoSeconds;
+}
+
+void nonLocalMeans(double* X, int m, int n, int w, double sigma, double patchSigma, double* F) {
+  // TODO: denoise image X and save output to image F
+}
 
 void printMatrixInt(int* A, int n, int m) {
   for(int j = 0; j < m*2+3; ++j) {
@@ -51,71 +73,156 @@ void printMatrixMatlab(double* A, int m, int n, char* name) {
   printf("];\n");
 }
 
+double gaussianRand(double sigma) {
+  double sum = 0.0;
+  for(int i = 0; i < 10; ++i) {
+    sum += -2.0*sqrt(12)*sigma*(double)rand()/RAND_MAX+1.0*sqrt(12)*sigma;
+  }
+  sum /= 10.0;
+  return sum;
+}
+
 int main(int argc, char* argv[]) {
 
+  // Get image size
   int m = atoi(argv[1]);
   int n = atoi(argv[2]);
-  // Patch size
+
+  // Get patch size
   int w = atoi(argv[3]);
-  double low = -5.0, high = 5.0;
-  // Image array (extended to fit patches)
+
+  // Image 1D array (row major) (extended to fit patches)
   double* X = (double*)malloc((m+w-1)*(n+w-1)*sizeof(double));
+
+  // Read input image from txt file of doubles
+  FILE* fptr = fopen("myFile.txt", "r");
 
   for(int i = (w-1)/2; i < m+(w-1)/2; ++i)
     for(int j = (w-1)/2; j < n+(w-1)/2; ++j)
-      X[i*(n+w-1)+j] = (double)(exp(-pow((double)(i-m/2)/(double)m,2.0)-pow((double)(j-n/2)/(double)n,2.0)));
+      fscanf(fptr, "%lf ", X+i*(n+w-1)+j);
+      // X[i*(n+w-1)+j] = (i % (m / 8) == 0 || j % (n / 8) == 0) ? 1.0 : 0.0;
+  fclose(fptr);
+
+  printf("figure;\n");
+  // Print original image in matlab command format
+  printMatrixMatlab(X, m+w-1, n+w-1,"X");
+
+  // Add gaussian noise to image (with standard deviation 0.05)
+  for(int i = (w-1)/2; i < m+(w-1)/2; ++i)
+    for(int j = (w-1)/2; j < n+(w-1)/2; ++j)
+      X[i*(n+w-1)+j] += gaussianRand(0.1);
 
 
+  // Fill edges mirroring the inside of image
+  // Right and left part
+  for(int i = (w-1)/2; i < m+(w-1)/2; ++i) {
+
+    for(int j = 0; j < (w-1)/2; ++j) {
+      X[i*(n+w-1)+j] = X[i*(n+w-1)+((w-1)/2-j+1)];
+    }
+
+    for(int j = n+(w-1)/2; j < (n+w-1); ++j) {
+      X[i*(n+w-1)+j] = X[i*(n+w-1)+((w-1)/2-(n+w-1-j-1))];
+    }
+
+  }
+
+  // Print noisy image in matlab command format
+  // printMatrixDouble(X, m+w-1, n+w-1);
+  printMatrixMatlab(X, m+w-1, n+w-1, "Xn");
+
+  // Define denoised image
   double* F = (double*)malloc(m*n*sizeof(double));
 
-  // Patch window
+  // Get gaussian patch standard deviation
+  double patchSigma = 1.0;
+  sscanf(argv[4],"%lf",&patchSigma);
+
+
+  // Define and fill normalized gaussian patch window
   double* W = (double*)malloc(w*w*sizeof(double));
+  double sum = 0.0;
+  for(int i = 0; i < w; ++i)
+    for(int j = 0; j < w; ++j) {
+      W[i*w+j] = exp((-pow((double)(i-w/2)/(double)w, 2)-pow((double)(j-w/2)/(double)w, 2))/(2.0*patchSigma));
+      sum += W[i*w+j];
+    }
+
   for(int i = 0; i < w; ++i)
     for(int j = 0; j < w; ++j)
-      W[i*w+j] = exp(-pow((double)(i-w/2)/(double)w, 2)-pow((double)(j-w/2)/(double)w, 2));
+      W[i*w+j] /= sum;
 
+  // Print patch window in matlab command format
   printMatrixMatlab(W, w, w, "w");
+  // printMatrixDouble(W, w, w);
 
 
   // Weight w(x,y)
   double Wxy = 0.0;
+  // Sum of weights Z(i)
   double Zx = 0.0;
+  // Distance of patches
   double D = 0.0;
-  double sigma = 1.0;
-  // Each pixel (i,j) will be the weighted sum of all other pixels
+  // Get standard deviation of gaussian filter
+  // (G(a) as mentioned in excercise formula)
+  double filtSigma = 1.0;
+  sscanf(argv[5],"%lf",&filtSigma);
+
+  // Start measuring execution time
+  struct timespec start_time;
+	clock_gettime(CLOCK_MONOTONIC, &start_time);
+  // Each pixel (i,j) of the denoised image
+  // will be the weighted sum of
+  // all other pixels of the noisy image
   for(int i = (w-1)/2; i < m+(w-1)/2; ++i) {
     for(int j = (w-1)/2; j < n+(w-1)/2; ++j) {
-      // Set value of pixel to 0
-      // so as to start the summation
-      // F[i*n+j] = 0.0;
+      // Set value of denoised image pixel
+      // to 0 for summation
+      F[i*n+j] = 0.0;
       // Then iterate all other pixels
       // and calulcate the weight Wxy
-      // Zx = 0.0;
-      printf("(%d, %d):\n", i, j);
+      // for each other pixel
+      //
+      // Zx is the normalization factor
+      Zx = 0.0;
       for(int k = (w-1)/2; k < m+(w-1)/2; ++k) {
         for(int l = (w-1)/2; l < n+(w-1)/2; ++l) {
-          printf("\t(%d, %d):\n", k, l);
-          // if((i*n+j) != (k*n+l)) {
+          // printf("\t(%d, %d):\n", k, l);
             Wxy = 0.0;
-            // Iterate all patch elements
             D = 0.0;
+            // Iterate all patch elements
+            // to find similarity of patches around X(i,j) and X(k,l)
+            // using gaussian kernel
+            // (p,q) is patch pixel relative to the center pixel (0,0)
             for(int p = -(w-1)/2; p <= (w-1)/2; ++p) {
               for(int q = -(w-1)/2; q <= (w-1)/2; ++q) {
-                printf("\t\t(%d, %d), (%d, %d)\n", i+p, j+q, k+p, l+q);
-                D += W[(p+(w-1)/2)*w+(q+(w-1)/2)]*pow((X[(i+p)*(n+w-1)+(j+q)] - X[(k+p)*(n+w-1)+(l+q)]),2);
+                D += W[(p+(w-1)/2)*w+(q+(w-1)/2)]*pow(X[(i+p)*(n+w-1)+(j+q)] - X[(k+p)*(n+w-1)+(l+q)], 2.0);
+                // printf("Distance: %lf\n", D);
               }
             }
-            Wxy = exp(-D/(sigma*sigma));
+            // Set weight which shows similarity
+             // of patches (i,j) and (k,l)
+            Wxy = exp(-D/(filtSigma*filtSigma));
+            // Add weight to Z(i) for normalization
             Zx += Wxy;
+            // Add weighted pixel to final sum
             F[i*n+j] += Wxy * X[k*n+l];
-          // }
         }
       }
+      // printf("Done: %lf\n", Zx);
       // Normalize sum
-      F[i*(n+w-1)+j] /= Zx;
+      // printf("%lf\n", F[i*n+j]);
+      // Normalize by dividing with Z(i)
+      // This is our final denoised image pixel value
+      // After this we continue to the next pixel
+      F[i*n+j] /= Zx;
+      // printf("Done: %lf\n", F[i*n+j]);
     }
   }
+  // printMatrixDouble(F, m, n);
+  printMatrixMatlab(F, m, n, "F");
 
-  printMatrixDouble(F, m, n);
+  printf("subplot(1,3,1);imshow(X,[]);title('Original');subplot(1,3,2);imshow(Xn,[]);title('Noisy');subplot(1,3,3);imshow(F,[]);title('Denoised');\n");
+  // printf("\nV0 run time: %f\n", calculateExecutionTime(start_time));
   return 0;
 }
