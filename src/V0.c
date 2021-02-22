@@ -20,10 +20,6 @@ double calculateExecutionTime(struct timespec start_time)
     return dSeconds + dNanoSeconds;
 }
 
-void nonLocalMeans(double* X, int m, int n, int w, double sigma, double patchSigma, double* F) {
-  // TODO: denoise image X and save output to image F
-}
-
 void printMatrixInt(int* A, int n, int m) {
   for(int j = 0; j < m*2+3; ++j) {
     printf("-");
@@ -42,7 +38,7 @@ void printMatrixInt(int* A, int n, int m) {
   printf("\n");
 }
 
-void printMatrixDouble(double* A, int n, int m) {
+void printMatrixFloat(float* A, int n, int m) {
   for(int j = 0; j < m*11; ++j) {
     printf("-");
   }
@@ -51,9 +47,9 @@ void printMatrixDouble(double* A, int n, int m) {
     printf("| ");
     for(int j = 0; j < m; ++j) {
       if(A[i*m+j] < 0.0)
-        printf("%lf ", A[i*m+j]);
+        printf("%f ", A[i*m+j]);
       else
-        printf(" %lf ", A[i*m+j]);
+        printf(" %f ", A[i*m+j]);
 		}
 		printf(" |\n");
 	}
@@ -63,20 +59,20 @@ void printMatrixDouble(double* A, int n, int m) {
   printf("\n");
 }
 
-void printMatrixMatlab(double* A, int m, int n, char* name) {
+void printMatrixMatlab(float* A, int m, int n, char* name) {
   printf("%s = [", name);
   for(int i = 0; i < m; ++i) {
     for(int j = 0; j < n; ++j)
-      printf("%lf ", A[i*n+j]);
+      printf("%f ", A[i*n+j]);
     printf(";");
   }
   printf("];\n");
 }
 
-double gaussianRand(double sigma) {
-  double sum = 0.0;
+float gaussianRand(double sigma) {
+  float sum = 0.0;
   for(int i = 0; i < 10; ++i) {
-    sum += -2.0*sqrt(12)*sigma*(double)rand()/RAND_MAX+1.0*sqrt(12)*sigma;
+    sum += -2.0*sqrt(12)*sigma*(float)rand()/RAND_MAX+1.0*sqrt(12)*sigma;
   }
   sum /= 10.0;
   return sum;
@@ -92,14 +88,30 @@ int main(int argc, char* argv[]) {
   int w = atoi(argv[3]);
 
   // Image 1D array (row major) (extended to fit patches)
-  double* X = (double*)malloc((m+w-1)*(n+w-1)*sizeof(double));
+  float* X = (float*)malloc((m+w-1)*(n+w-1)*sizeof(float));
 
+  char* filename = "";
+  switch(m) {
+    case 64:
+      filename = "lena_64.txt";
+      break;
+    case 128:
+      filename = "lena_128.txt";
+      break;
+    case 256:
+      filename = "lena_256.txt";
+      break;
+    case 512:
+      filename = "lena_512.txt";
+      break;
+  }
+  // printf("Reading: %s\n", filename);
   // Read input image from txt file of doubles
-  FILE* fptr = fopen("myFile.txt", "r");
+  FILE* fptr = fopen(filename, "r");
 
   for(int i = (w-1)/2; i < m+(w-1)/2; ++i)
     for(int j = (w-1)/2; j < n+(w-1)/2; ++j)
-      fscanf(fptr, "%lf ", X+i*(n+w-1)+j);
+      fscanf(fptr, "%f,", X+i*(n+w-1)+j);
       // X[i*(n+w-1)+j] = (i % (m / 8) == 0 || j % (n / 8) == 0) ? 1.0 : 0.0;
   fclose(fptr);
 
@@ -107,46 +119,65 @@ int main(int argc, char* argv[]) {
   // Print original image in matlab command format
   printMatrixMatlab(X, m+w-1, n+w-1,"X");
 
-  // Add gaussian noise to image (with standard deviation 0.05)
+  // Add gaussian noise to image (with standard deviation 0.04)
   for(int i = (w-1)/2; i < m+(w-1)/2; ++i)
     for(int j = (w-1)/2; j < n+(w-1)/2; ++j)
-      X[i*(n+w-1)+j] += gaussianRand(0.1);
+      X[i*(n+w-1)+j] += gaussianRand(0.04);
 
 
   // Fill edges mirroring the inside of image
+
   // Right and left part
   for(int i = (w-1)/2; i < m+(w-1)/2; ++i) {
 
     for(int j = 0; j < (w-1)/2; ++j) {
-      X[i*(n+w-1)+j] = X[i*(n+w-1)+((w-1)/2-j+1)];
+      X[i*(n+w-1)+j] = X[i*(n+w-1)+(w-j-1)];
     }
 
-    for(int j = n+(w-1)/2; j < (n+w-1); ++j) {
-      X[i*(n+w-1)+j] = X[i*(n+w-1)+((w-1)/2-(n+w-1-j-1))];
+    for(int j = 1; j <= (w-1)/2 ; ++j) {
+      X[i*(n+w-1)+((n+w-1)-j)] = X[i*(n+w-1)+((n+w-1)-(w-(j-1)))];
     }
 
   }
+
+  // Upper and lower part
+  for(int i = (w-1)/2; i < m+(w-1)/2; ++i) {
+
+    for(int j = 0; j < (w-1)/2; ++j) {
+      X[j*(n+w-1)+i] = X[(w-j-1)*(n+w-1)+i];
+    }
+
+    for(int j = 1; j <= (w-1)/2 ; ++j) {
+      X[((n+w-1)-j)*(n+w-1)+i] = X[((n+w-1)-(w-(j-1)))*(n+w-1)+i];
+    }
+
+  }
+
+  // Corners ((w-1)/2 by (w-1)/2)
+
 
   // Print noisy image in matlab command format
   // printMatrixDouble(X, m+w-1, n+w-1);
   printMatrixMatlab(X, m+w-1, n+w-1, "Xn");
 
   // Define denoised image
-  double* F = (double*)malloc(m*n*sizeof(double));
+  float* F = (float*)malloc(m*n*sizeof(float));
 
   // Get gaussian patch standard deviation
-  double patchSigma = 1.0;
-  sscanf(argv[4],"%lf",&patchSigma);
+  float patchSigma = 1.0;
+  sscanf(argv[4],"%f",&patchSigma);
 
 
   // Define and fill normalized gaussian patch window
-  double* W = (double*)malloc(w*w*sizeof(double));
-  double sum = 0.0;
-  for(int i = 0; i < w; ++i)
+  float* W = (float*)malloc(w*w*sizeof(float));
+  float sum = 0.0;
+  for(int i = 0; i < w; ++i) {
     for(int j = 0; j < w; ++j) {
-      W[i*w+j] = exp((-pow((double)(i-w/2)/(double)w, 2)-pow((double)(j-w/2)/(double)w, 2))/(2.0*patchSigma));
+      W[i*w+j] = exp((-pow((float)(i-w/2)/(float)w, 2)-pow((float)(j-w/2)/(float)w, 2))/(2.0*patchSigma));
+      // W[i*w+j] = 1.0;
       sum += W[i*w+j];
     }
+  }
 
   for(int i = 0; i < w; ++i)
     for(int j = 0; j < w; ++j)
@@ -158,15 +189,15 @@ int main(int argc, char* argv[]) {
 
 
   // Weight w(x,y)
-  double Wxy = 0.0;
+  float Wxy = 0.0;
   // Sum of weights Z(i)
-  double Zx = 0.0;
+  float Zx = 0.0;
   // Distance of patches
-  double D = 0.0;
+  float D = 0.0;
   // Get standard deviation of gaussian filter
   // (G(a) as mentioned in excercise formula)
-  double filtSigma = 1.0;
-  sscanf(argv[5],"%lf",&filtSigma);
+  float filtSigma = 1.0;
+  sscanf(argv[5],"%f",&filtSigma);
 
   // Start measuring execution time
   struct timespec start_time;
@@ -178,7 +209,7 @@ int main(int argc, char* argv[]) {
     for(int j = (w-1)/2; j < n+(w-1)/2; ++j) {
       // Set value of denoised image pixel
       // to 0 for summation
-      F[i*n+j] = 0.0;
+      F[(i-(w-1)/2)*n+(j-(w-1)/2)] = 0.0;
       // Then iterate all other pixels
       // and calulcate the weight Wxy
       // for each other pixel
@@ -196,17 +227,19 @@ int main(int argc, char* argv[]) {
             // (p,q) is patch pixel relative to the center pixel (0,0)
             for(int p = -(w-1)/2; p <= (w-1)/2; ++p) {
               for(int q = -(w-1)/2; q <= (w-1)/2; ++q) {
-                D += W[(p+(w-1)/2)*w+(q+(w-1)/2)]*pow(X[(i+p)*(n+w-1)+(j+q)] - X[(k+p)*(n+w-1)+(l+q)], 2.0);
+                D += W[(p+(w-1)/2)*w+(q+(w-1)/2)]*pow((X[(i+p)*(n+w-1)+(j+q)] - X[(k+p)*(n+w-1)+(l+q)]), 2.0);
                 // printf("Distance: %lf\n", D);
               }
             }
+            // printf("%lf\n", D);
             // Set weight which shows similarity
              // of patches (i,j) and (k,l)
             Wxy = exp(-D/(filtSigma*filtSigma));
             // Add weight to Z(i) for normalization
             Zx += Wxy;
             // Add weighted pixel to final sum
-            F[i*n+j] += Wxy * X[k*n+l];
+            F[(i-(w-1)/2)*n+(j-(w-1)/2)] += Wxy * X[k*(n+w-1)+l];
+            // printf("Wxy = %f\n", Wxy);
         }
       }
       // printf("Done: %lf\n", Zx);
@@ -215,14 +248,14 @@ int main(int argc, char* argv[]) {
       // Normalize by dividing with Z(i)
       // This is our final denoised image pixel value
       // After this we continue to the next pixel
-      F[i*n+j] /= Zx;
-      // printf("Done: %lf\n", F[i*n+j]);
+      F[(i-(w-1)/2)*n+(j-(w-1)/2)] /= Zx;
+      // printf("Done2: %lf\n", F[i*n+j]);
     }
   }
   // printMatrixDouble(F, m, n);
   printMatrixMatlab(F, m, n, "F");
 
   printf("subplot(1,3,1);imshow(X,[]);title('Original');subplot(1,3,2);imshow(Xn,[]);title('Noisy');subplot(1,3,3);imshow(F,[]);title('Denoised');\n");
-  // printf("\nV0 run time: %f\n", calculateExecutionTime(start_time));
+  printf("\n%% V0 run time: %f\n", calculateExecutionTime(start_time));
   return 0;
 }
