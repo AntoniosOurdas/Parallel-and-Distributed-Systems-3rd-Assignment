@@ -5,11 +5,11 @@
 #include <cuda.h>
 
 // CUDA kernel to compute denoise image
-__global__ void nonLocalMeans(float* P, int m, int n, int w, float filtSigma, float* F) {
+__global__ void nonLocalMeans(double* P, int m, int n, int w, double filtSigma, double* F) {
 
-  float Wxy = 0.0;
-  float Zx = 0.0;
-  float D = 0.0;
+  double Wxy = 0.0;
+  double Zx = 0.0;
+  double D = 0.0;
 
   int i = blockIdx.x;
   int j = threadIdx.x;
@@ -57,7 +57,7 @@ void printMatrixInt(int* A, int n, int m) {
   printf("\n");
 }
 
-void printMatrixFloat(float* A, int n, int m) {
+void printMatrixDouble(double* A, int n, int m) {
   for(int j = 0; j < m*11; ++j) {
     printf("-");
   }
@@ -78,7 +78,7 @@ void printMatrixFloat(float* A, int n, int m) {
   printf("\n");
 }
 
-void printMatrixMatlab(float* A, int m, int n, char* name) {
+void printMatrixMatlab(double* A, int m, int n, char* name) {
   printf("%s = [", name);
   for(int i = 0; i < m; ++i) {
     for(int j = 0; j < n; ++j)
@@ -88,7 +88,7 @@ void printMatrixMatlab(float* A, int m, int n, char* name) {
   printf("];\n");
 }
 
-void printMatrixMatlab3D(float* A, int d1, int d2, int d3, char* name) {
+void printMatrixMatlab3D(double* A, int d1, int d2, int d3, char* name) {
   for(int i = 0; i < d1; ++i) {
     printf("%s(:,:,%d) = [", name, i+1);
     for(int j = 0; j <d2; ++j) {
@@ -102,10 +102,10 @@ void printMatrixMatlab3D(float* A, int d1, int d2, int d3, char* name) {
 
 // Auxiliary function to generate random gaussian number
 // used for adding gaussian noise
-float gaussianRand(float sigma) {
-  float sum = 0.0;
+double gaussianRand(double sigma) {
+  double sum = 0.0;
   for(int i = 0; i < 30; ++i) {
-    sum += -2.0*sqrtf(12)*sigma*(float)rand()/RAND_MAX+1.0*sqrtf(12)*sigma;
+    sum += -2.0*sqrtf(12)*sigma*(double)rand()/RAND_MAX+1.0*sqrtf(12)*sigma;
   }
   sum /= 30.0;
   return sum;
@@ -113,7 +113,7 @@ float gaussianRand(float sigma) {
 
 // Function for writing image array to csv format txt file
 // which can then be read by ReadImage.m Matlab script
-void printMatrixCsv(float* A, int m, int n, char* name) {
+void printMatrixCsv(double* A, int m, int n, char* name) {
   FILE* ptr = fopen(name, "w");
   if(ptr == NULL) {
     printf("Failed to create output file. Exiting!\n");
@@ -122,7 +122,7 @@ void printMatrixCsv(float* A, int m, int n, char* name) {
   for(int i = 0; i < m; ++i) {
     fprintf(ptr, "%f", A[i*n]);
     for(int j = 0; j < n; ++j) {
-      fprintf(ptr, ",%f", A[i*n+j]);
+      fprintf(ptr, ",%lf", A[i*n+j]);
     }
     fprintf(ptr,"\n");
   }
@@ -137,18 +137,18 @@ int main(int argc, char* argv[]) {
   int n = atoi(argv[2]);
   int w = atoi(argv[3]);
 
-  float patchSigma = 2.0;
+  double patchSigma = 2.0;
   sscanf(argv[4],"%lf",&patchSigma);
 
-  float filtSigma = 0.02;
+  double filtSigma = 0.02;
   sscanf(argv[5],"%lf",&filtSigma);
 
   // Create gaussian kernel
-  float* W = (float*)malloc(w*w*sizeof(float));
-  float sum = 0.0;
+  double* W = (double*)malloc(w*w*sizeof(double));
+  double sum = 0.0;
   for(int i = 0; i < w; ++i) {
     for(int j = 0; j < w; ++j) {
-      W[i*w+j] = exp((-pow((float)(i-w/2)/(float)w, 2)-pow((float)(j-w/2)/(float)w, 2))/(2.0*patchSigma*patchSigma));
+      W[i*w+j] = exp((-pow((double)(i-w/2)/(double)w, 2)-pow((double)(j-w/2)/(double)w, 2))/(2.0*patchSigma*patchSigma));
       sum += W[i*w+j];
     }
   }
@@ -160,19 +160,19 @@ int main(int argc, char* argv[]) {
 
 
   // Original Image extended to fit patches on the edges [(m+w-1)-by-(n+w-1)]
-  float* X = (float*)malloc((m+w-1)*(n+w-1)*sizeof(float));
+  double* X = (double*)malloc((m+w-1)*(n+w-1)*sizeof(double));
   // 3D Patch Cube [m-by-n-by-w-by-w]
-  float* P = (float*)malloc(m*n*w*w*sizeof(float));
+  double* P = (double*)malloc(m*n*w*w*sizeof(double));
   // Filtered image [m-by-n]
-  float* F = (float*)malloc(m*n*sizeof(float));
+  double* F = (double*)malloc(m*n*sizeof(double));
 
   // 3D Patch cude pointer for GPU memory
-  float* deviceP = NULL;
-  cudaMalloc(&deviceP, m*n*w*w*sizeof(float));
+  double* deviceP = NULL;
+  cudaMalloc(&deviceP, m*n*w*w*sizeof(double));
 
   // Filtered image pointer for GPU memory
-  float* deviceF = NULL;
-  cudaMalloc(&deviceF, m*n*sizeof(float));
+  double* deviceF = NULL;
+  cudaMalloc(&deviceF, m*n*sizeof(double));
 
   // Stings used for input/output files
   char filename[30] = "";
@@ -266,11 +266,11 @@ int main(int argc, char* argv[]) {
   strcat(outputFileNoisy, strcat(filename2, "_noisy.txt"));
   printf("%s\n", outputFileNoisy);
   printMatrixCsv(X, m+w-1, n+w-1, outputFileNoisy);
-  
+
   // Copy data for input and output
   // from CPU memory to GPU memory
-  cudaMemcpy(deviceP, P, m*n*w*w*sizeof(float), cudaMemcpyHostToDevice);
-  cudaMemcpy(deviceF, F, m*n*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(deviceP, P, m*n*w*w*sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(deviceF, F, m*n*sizeof(double), cudaMemcpyHostToDevice);
 
   // CUDA events used for measuring time
   cudaEvent_t start, stop;
@@ -284,8 +284,8 @@ int main(int argc, char* argv[]) {
 
   // Copy data for input and output
   // from CPU memory to GPU memory
-  cudaMemcpy(P, deviceP, m*n*w*w*sizeof(float), cudaMemcpyDeviceToHost);
-  cudaMemcpy(F, deviceF, m*n*sizeof(float), cudaMemcpyDeviceToHost);
+  cudaMemcpy(P, deviceP, m*n*w*w*sizeof(double), cudaMemcpyDeviceToHost);
+  cudaMemcpy(F, deviceF, m*n*sizeof(double), cudaMemcpyDeviceToHost);
 
   // Find original denoised pixel
   // divinding by center pixel
