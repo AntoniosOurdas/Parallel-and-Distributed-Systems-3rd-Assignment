@@ -115,7 +115,9 @@ int main(int argc, char* argv[]) {
   // Write noisy image to csv txt file
   // used by matlab script
   char outputFileNoisy[50] = "../output_images/";
-  strcat(outputFileNoisy, strcat(filename2, "_noisy.txt"));
+  char image_info[20];
+  sprintf(image_info, "_%d", w);
+  strcat(outputFileNoisy, strcat(filename2, strcat(image_info, "_noisy.txt")));
   printf("%s\n", outputFileNoisy);
   printMatrixCsv(X, m+w-1, n+w-1, outputFileNoisy);
 
@@ -191,11 +193,16 @@ int main(int argc, char* argv[]) {
   // Write filtered image to csv txt file
   // used by matlab script
   char outputFileDenoised[30] = "../output_images/";
-  strcat(outputFileDenoised, strcat(filename3, "_denoised.txt"));
+  char image_info2[20];
+  sprintf(image_info2, "_%d", w);
+  strcat(outputFileDenoised, strcat(filename3, strcat(image_info2, "_denoised.txt")));
   printf("%s\n", outputFileDenoised);
   printMatrixCsv(F, m, n, outputFileDenoised);
 
   printf("\n%% V0 run time: %f\n", calculateExecutionTime(start_time));
 
+  free(X);
+  free(W);
+  free(F);
   return 0;
 }
