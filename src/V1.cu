@@ -1,8 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-#include <time.h>
-#include <cuda.h>
+#include "utilities.cuh"
 
 // CUDA kernel to compute denoise image
 __global__ void nonLocalMeans(double* P, int m, int n, int w, double filtSigma, double* F) {
@@ -38,104 +34,34 @@ __global__ void nonLocalMeans(double* P, int m, int n, int w, double filtSigma, 
   return;
 }
 
-// Auxiliary matrix printing functions
-void printMatrixInt(int* A, int n, int m) {
-  for(int j = 0; j < m*2+3; ++j) {
-    printf("-");
-  }
-  printf("\n");
-  for(int i = 0; i < n; ++i) {
-    printf("| ");
-    for(int j = 0; j < m; ++j) {
-      printf("%d ", A[i*m+j]);
-    }
-    printf("|\n");
-  }
-  for(int j = 0; j < m*2+3; ++j) {
-    printf("-");
-  }
-  printf("\n");
-}
-
-void printMatrixDouble(double* A, int n, int m) {
-  for(int j = 0; j < m*11; ++j) {
-    printf("-");
-  }
-  printf("\n");
-  for(int i = 0; i < n; ++i) {
-    printf("| ");
-    for(int j = 0; j < m; ++j) {
-      if(A[i*m+j] < 0.0)
-        printf("%lf ", A[i*m+j]);
-      else
-        printf(" %lf ", A[i*m+j]);
-    }
-    printf(" |\n");
-  }
-  for(int j = 0; j < m*11; ++j) {
-    printf("-");
-  }
-  printf("\n");
-}
-
-void printMatrixMatlab(double* A, int m, int n, char* name) {
-  printf("%s = [", name);
-  for(int i = 0; i < m; ++i) {
-    for(int j = 0; j < n; ++j)
-      printf("%lf ", A[i*n+j]);
-    printf(";");
-  }
-  printf("];\n");
-}
-
-void printMatrixMatlab3D(double* A, int d1, int d2, int d3, char* name) {
-  for(int i = 0; i < d1; ++i) {
-    printf("%s(:,:,%d) = [", name, i+1);
-    for(int j = 0; j <d2; ++j) {
-      for(int k = 0; k < d3; ++k)
-        printf("%lf ", A[i*d2*d3+j*d3+k]);
-      printf(";");
-    }
-    printf("];\n");
-  }
-}
-
-// Auxiliary function to generate random gaussian number
-// used for adding gaussian noise
-double gaussianRand(double sigma) {
-  double sum = 0.0;
-  for(int i = 0; i < 30; ++i) {
-    sum += -2.0*sqrtf(12)*sigma*(double)rand()/RAND_MAX+1.0*sqrtf(12)*sigma;
-  }
-  sum /= 30.0;
-  return sum;
-}
-
-// Function for writing image array to csv format txt file
-// which can then be read by ReadImage.m Matlab script
-void printMatrixCsv(double* A, int m, int n, char* name) {
-  FILE* ptr = fopen(name, "w");
-  if(ptr == NULL) {
-    printf("Failed to create output file. Exiting!\n");
-    return;
-  }
-  for(int i = 0; i < m; ++i) {
-    fprintf(ptr, "%f", A[i*n]);
-    for(int j = 0; j < n; ++j) {
-      fprintf(ptr, ",%lf", A[i*n+j]);
-    }
-    fprintf(ptr,"\n");
-  }
-  fclose(ptr);
-}
-
 // Main function
 int main(int argc, char* argv[]) {
+
+  // Various checks for valid input arguments
+  if(argc < 7) {
+    printf("Usage: V0 m n w input_image\n");
+    return 1;
+  }
 
   // Read input arguments
   int m = atoi(argv[1]);
   int n = atoi(argv[2]);
   int w = atoi(argv[3]);
+
+  if(m != n) {
+    printf("Only square images supported\n");
+    return 1;
+  }
+
+  if(m != 64 && m != 128 && m != 256) {
+    printf("Only 64x64, 128x128 and 256x256 size images supported\n");
+    return 1;
+  }
+
+  if(w != 3 && w != 5 && w != 7) {
+    printf("Only 3x3, 5x5 and 7x7 patch sizes supported\n");
+    return 1;
+  }
 
   double patchSigma = 2.0;
   sscanf(argv[4],"%lf",&patchSigma);
@@ -165,6 +91,8 @@ int main(int argc, char* argv[]) {
   double* P = (double*)malloc(m*n*w*w*sizeof(double));
   // Filtered image [m-by-n]
   double* F = (double*)malloc(m*n*sizeof(double));
+  // Residual image (F - x)
+  double* R = (double*)malloc(m*n*sizeof(double));
 
   // 3D Patch cude pointer for GPU memory
   double* deviceP = NULL;
@@ -174,10 +102,8 @@ int main(int argc, char* argv[]) {
   double* deviceF = NULL;
   cudaMalloc(&deviceF, m*n*sizeof(double));
 
-  // Stings used for input/output files
-  char filename[30] = "";
-  char filename2[30] = "";
-  char filename3[30] = "";
+  // Sting used for input/output files
+  char filename[10] = "";
 
   switch(m) {
     case 64:
@@ -189,20 +115,11 @@ int main(int argc, char* argv[]) {
     case 256:
       strcpy(filename, "lena_256");
       break;
-    case 512:
-      strcpy(filename, "lena_512");
-      break;
   }
 
-  strcpy(filename2, filename);
-  strcpy(filename3, filename);
+  // printf("Reading input image from %s\n", argv[6]);
 
-  char inputFile[50] = "../input_images/";
-  strcat(inputFile, strcat(filename, ".txt"));
-  printf("%s\n", inputFile);
-
-  // Read input image
-  FILE* fptr = fopen(inputFile, "r");
+  FILE* fptr = fopen(argv[6], "r");
   for(int i = (w-1)/2; i < m+(w-1)/2; ++i)
     for(int j = (w-1)/2; j < n+(w-1)/2; ++j)
       fscanf(fptr, "%lf,", X+i*(n+w-1)+j);
@@ -262,12 +179,10 @@ int main(int argc, char* argv[]) {
 
   // Write noisy image to csv txt file
   // used by matlab script
-  char outputFileNoisy[50] = "../output_images/";
-  char image_info[20];
-  sprintf(image_info, "_%d", w);
-  strcat(outputFileNoisy, strcat(filename2, strcat(image_info, "_noisy.txt")));
-  printf("%s\n", outputFileNoisy);
-  printMatrixCsv(X, m+w-1, n+w-1, outputFileNoisy);
+  char outputFileName[100] = "";
+  sprintf(outputFileName, "../output_images/%s_%d_noisy.txt", filename, w);
+  // printf("Writing noisy image to %s\n", outputFileName);
+  printMatrixCsv(X, m+w-1, n+w-1, outputFileName);
 
   // Copy data for input and output
   // from CPU memory to GPU memory
@@ -300,16 +215,24 @@ int main(int argc, char* argv[]) {
   float milliseconds = 0;
   cudaEventElapsedTime(&milliseconds, start, stop);
 
+  // Calculate residual image
+  for(int i = 0; i < m; ++i) {
+    for(int j = 0; j < n; ++j) {
+      R[i*n+j] = F[i*n+j] - X[(i+(w-1)/2)*(n+w-1)+(j+(w-1)/2)];
+    }
+  }
+
   // Write filtered image to csv txt file
   // used by matlab script
-  char outputFileDenoised[30] = "../output_images/";
-  char image_info2[20];
-  sprintf(image_info2, "_%d", w);
-  strcat(outputFileDenoised, strcat(filename3, strcat(image_info2, "_denoised.txt")));
-  printf("%s\n", outputFileDenoised);
-  printMatrixCsv(F, m, n, outputFileDenoised);
+  sprintf(outputFileName, "../output_images/%s_%d_denoised.txt", filename, w);
+  // printf("Writing denoised image to %s\n", outputFileName);
+  printMatrixCsv(F, m, n, outputFileName);
 
-  printf("%%Exceution time: %lf\n", milliseconds);
+  sprintf(outputFileName, "../output_images/%s_%d_residual.txt", filename, w);
+  // printf("Writing residual image to %s\n", outputFileName);
+  printMatrixCsv(R, m, n, outputFileName);
+
+  printf("%lf\n", milliseconds);
 
   // Deallocate CPU and GPU memory
   cudaFree(deviceP);
@@ -318,6 +241,7 @@ int main(int argc, char* argv[]) {
   free(F);
   free(W);
   free(P);
+  free(R);
 
   return 0;
 }
