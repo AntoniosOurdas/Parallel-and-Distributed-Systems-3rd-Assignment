@@ -6,10 +6,10 @@ V0:
 	$(CC) V0.c utilities.c -o V0 $(LIBRARIES)
 
 V1:
-	$(NVCC) V1.cu -o V1 $(LIBRARIES)
+	$(NVCC) V1.cu utilities.cu -o V1 $(LIBRARIES)
 
 V2:
-	$(MPICC) V2.cu -o V2 $(LIBRARIES)
+	$(MPICC) V2.cu utilities.cu -o V2 $(LIBRARIES)
 
 all: V0 V1 V2
 
