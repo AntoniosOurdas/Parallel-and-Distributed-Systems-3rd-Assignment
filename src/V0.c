@@ -5,42 +5,64 @@
 // struct timespec start_time;
 struct timespec stop_time;
 
-float calculateExecutionTime(struct timespec start_time)
+double calculateExecutionTime(struct timespec start_time)
 {
 
     clock_gettime(CLOCK_MONOTONIC, &stop_time);
 
-    float dSeconds = (stop_time.tv_sec - start_time.tv_sec);
+    double dSeconds = (stop_time.tv_sec - start_time.tv_sec);
 
-    float dNanoSeconds = (float)(stop_time.tv_nsec - start_time.tv_nsec) / BILLION;
+    double dNanoSeconds = (double)(stop_time.tv_nsec - start_time.tv_nsec) / BILLION;
 
     return dSeconds + dNanoSeconds;
 }
 
 int main(int argc, char* argv[]) {
 
+  // Various checks for valid input arguments
+  if(argc < 7) {
+    printf("Usage: V0 m n w input_image\n");
+    return 1;
+  }
+
   // Read input arguments
   int m = atoi(argv[1]);
   int n = atoi(argv[2]);
   int w = atoi(argv[3]);
 
-  float patchSigma = 2.0;
-  sscanf(argv[4],"%f",&patchSigma);
+  if(m != n) {
+    printf("Only square images supported\n");
+    return 1;
+  }
 
-  float filtSigma = 0.02;
-  sscanf(argv[5],"%f",&filtSigma);
+  if(m != 64 && m != 128 && m != 256) {
+    printf("Only 64x64, 128x128 and 256x256 size images supported\n");
+    return 1;
+  }
+
+  if(w != 3 && w != 5 && w != 7) {
+    printf("Only 3x3, 5x5 and 7x7 patch sizes supported\n");
+    return 1;
+  }
+
+  double patchSigma = 2.0;
+  sscanf(argv[4],"%lf",&patchSigma);
+
+  double filtSigma = 0.02;
+  sscanf(argv[5],"%lf",&filtSigma);
 
   // All arrays are 1 dimensional row major
   // Original Image extended to fit patches on the edges [(m+w-1)-by-(n+w-1)]
-  float* X = (float*)malloc((m+w-1)*(n+w-1)*sizeof(float));
+  double* X = (double*)malloc((m+w-1)*(n+w-1)*sizeof(double));
 
   // Filtered image [m-by-n]
-  float* F = (float*)malloc(m*n*sizeof(float));
+  double* F = (double*)malloc(m*n*sizeof(double));
 
-  // Stings used for input/output files
-  char filename[30] = "";
-  char filename2[30] = "";
-  char filename3[30] = "";
+  // Residual image (F - x)
+  double* R = (double*)malloc(m*n*sizeof(double));
+
+  // Sting used for input/output files
+  char filename[10] = "";
 
   switch(m) {
     case 64:
@@ -52,24 +74,18 @@ int main(int argc, char* argv[]) {
     case 256:
       strcpy(filename, "lena_256");
       break;
-    case 512:
-      strcpy(filename, "lena_512");
-      break;
   }
 
-  strcpy(filename2, filename);
-  strcpy(filename3, filename);
+  // printf("Reading input image from %s\n", argv[6]);
+  FILE* fptr = fopen(argv[6], "r");
+  if(fptr == NULL) {
+    printf("Error reading input image\n");
+    return 1;
+  }
 
-  // printf("Reading: %s\n", filename);
-  // Read input image from txt file of floats
-  char inputFile[50] = "../input_images/";
-  strcat(inputFile, strcat(filename, ".txt"));
-  printf("%s\n", inputFile);
-
-  FILE* fptr = fopen(inputFile, "r");
   for(int i = (w-1)/2; i < m+(w-1)/2; ++i)
     for(int j = (w-1)/2; j < n+(w-1)/2; ++j)
-      fscanf(fptr, "%f,", X+i*(n+w-1)+j);
+      fscanf(fptr, "%lf,", X+i*(n+w-1)+j);
       // X[i*(n+w-1)+j] = (i % (m / 8) == 0 || j % (n / 8) == 0) ? 1.0 : 0.0;
   fclose(fptr);
 
@@ -114,19 +130,17 @@ int main(int argc, char* argv[]) {
 
   // Write noisy image to csv txt file
   // used by matlab script
-  char outputFileNoisy[50] = "../output_images/";
-  char image_info[20];
-  sprintf(image_info, "_%d", w);
-  strcat(outputFileNoisy, strcat(filename2, strcat(image_info, "_noisy.txt")));
-  printf("%s\n", outputFileNoisy);
-  printMatrixCsv(X, m+w-1, n+w-1, outputFileNoisy);
+  char outputFileName[100] = "";
+  sprintf(outputFileName, "../output_images/%s_%d_noisy.txt", filename, w);
+  // printf("Writing noisy image to %s\n", outputFileName);
+  printMatrixCsv(X, m+w-1, n+w-1, outputFileName);
 
   // Define and fill normalized gaussian patch window
-  float* W = (float*)malloc(w*w*sizeof(float));
-  float sum = 0.0;
+  double* W = (double*)malloc(w*w*sizeof(double));
+  double sum = 0.0;
   for(int i = 0; i < w; ++i) {
     for(int j = 0; j < w; ++j) {
-      W[i*w+j] = exp((-pow((float)(i-w/2)/(float)w, 2)-pow((float)(j-w/2)/(float)w, 2))/(2.0*patchSigma));
+      W[i*w+j] = exp((-pow((double)(i-w/2)/(double)w, 2)-pow((double)(j-w/2)/(double)w, 2))/(2.0*patchSigma));
       sum += W[i*w+j];
     }
   }
@@ -137,11 +151,11 @@ int main(int argc, char* argv[]) {
 
 
   // Weight w(x,y)
-  float Wxy = 0.0;
+  double Wxy = 0.0;
   // Sum of weights Z(i)
-  float Zx = 0.0;
+  double Zx = 0.0;
   // Distance of patches
-  float D = 0.0;
+  double D = 0.0;
 
   // Start measuring execution time
   struct timespec start_time;
@@ -190,19 +204,28 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  // Write filtered image to csv txt file
-  // used by matlab script
-  char outputFileDenoised[30] = "../output_images/";
-  char image_info2[20];
-  sprintf(image_info2, "_%d", w);
-  strcat(outputFileDenoised, strcat(filename3, strcat(image_info2, "_denoised.txt")));
-  printf("%s\n", outputFileDenoised);
-  printMatrixCsv(F, m, n, outputFileDenoised);
+  // Calculate residual image
+  for(int i = 0; i < m; ++i) {
+    for(int j = 0; j < n; ++j) {
+      R[i*n+j] = F[i*n+j] - X[(i+(w-1)/2)*(n+w-1)+(j+(w-1)/2)];
+    }
+  }
 
-  printf("\n%% V0 run time: %f\n", calculateExecutionTime(start_time));
+  // Write filtered and residual image to csv txt files
+  // used by matlab script
+  sprintf(outputFileName, "../output_images/%s_%d_denoised.txt", filename, w);
+  // printf("Writing denoised image to %s\n", outputFileName);
+  printMatrixCsv(F, m, n, outputFileName);
+
+  sprintf(outputFileName, "../output_images/%s_%d_residual.txt", filename, w);
+  // printf("Writing residual image to %s\n", outputFileName);
+  printMatrixCsv(R, m, n, outputFileName);
+
+  printf("%lf\n", calculateExecutionTime(start_time));
 
   free(X);
   free(W);
   free(F);
+  free(R);
   return 0;
 }
