@@ -5,7 +5,7 @@
 #include <string.h>
 
 void printMatrixInt(int* A, int n, int m);
-void printMatrixFloat(float* A, int n, int m);
-void printMatrixMatlab(float* A, int m, int n, char* name);
-float gaussianRand(double sigma);
-void printMatrixCsv(float* A, int m, int n, char* name);
+void printMatrixDouble(double* A, int n, int m);
+void printMatrixMatlab(double* A, int m, int n, char* name);
+double gaussianRand(double sigma);
+void printMatrixCsv(double* A, int m, int n, char* name);
