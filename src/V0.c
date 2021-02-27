@@ -20,8 +20,8 @@ double calculateExecutionTime(struct timespec start_time)
 int main(int argc, char* argv[]) {
 
   // Various checks for valid input arguments
-  if(argc < 7) {
-    printf("Usage: V0 m n w input_image\n");
+  if(argc < 8) {
+    printf("Usage: ./V0 m n w input_image output_image_name\n");
     return 1;
   }
 
@@ -61,22 +61,6 @@ int main(int argc, char* argv[]) {
   // Residual image (F - x)
   double* R = (double*)malloc(m*n*sizeof(double));
 
-  // Sting used for input/output files
-  char filename[10] = "";
-
-  switch(m) {
-    case 64:
-      strcpy(filename, "lena_64");
-      break;
-    case 128:
-      strcpy(filename, "lena_128");
-      break;
-    case 256:
-      strcpy(filename, "lena_256");
-      break;
-  }
-
-  // printf("Reading input image from %s\n", argv[6]);
   FILE* fptr = fopen(argv[6], "r");
   if(fptr == NULL) {
     printf("Error reading input image\n");
@@ -131,7 +115,7 @@ int main(int argc, char* argv[]) {
   // Write noisy image to csv txt file
   // used by matlab script
   char outputFileName[100] = "";
-  sprintf(outputFileName, "../output_images/%s_%d_noisy.txt", filename, w);
+  sprintf(outputFileName, "../output_images/output_images_csv_txt/output_images_V0/%s_%d_%d_noisy.txt", argv[7], n, w);
   // printf("Writing noisy image to %s\n", outputFileName);
   printMatrixCsv(X, m+w-1, n+w-1, outputFileName);
 
@@ -213,11 +197,11 @@ int main(int argc, char* argv[]) {
 
   // Write filtered and residual image to csv txt files
   // used by matlab script
-  sprintf(outputFileName, "../output_images/%s_%d_denoised.txt", filename, w);
+  sprintf(outputFileName, "../output_images/output_images_csv_txt/output_images_V0/%s_%d_%d_denoised.txt", argv[7], n, w);
   // printf("Writing denoised image to %s\n", outputFileName);
   printMatrixCsv(F, m, n, outputFileName);
 
-  sprintf(outputFileName, "../output_images/%s_%d_residual.txt", filename, w);
+  sprintf(outputFileName, "../output_images/output_images_csv_txt/output_images_V0/%s_%d_%d_residual.txt", argv[7], n, w);
   // printf("Writing residual image to %s\n", outputFileName);
   printMatrixCsv(R, m, n, outputFileName);
 
