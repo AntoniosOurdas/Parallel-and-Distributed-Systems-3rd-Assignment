@@ -14,9 +14,10 @@ To compile the program simply go to src directory use provided Makefile by typin
 Usage of program is show below
 
 ```
-Usage: V0 m n w input_image
-  m:            height of input image
-  n:            width of input image
-  w:            patch window size
-  input_image:  input image (text file in csv format only)
+Usage: ./V0 m n w input_image
+  m:                 height of input image
+  n:                 width of input image
+  w:                 patch window size
+  input_image:       input image (text file in csv format only)
+  output_image_name: name for ouput image
 ```
