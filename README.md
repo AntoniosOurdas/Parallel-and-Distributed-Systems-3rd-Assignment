@@ -15,7 +15,7 @@ To compile the program simply go to src directory and use provided Makefile by t
 Usage of program is show below
 
 ```
-Usage: ./V0 m n w filtSigma patchSigma filtSigma input_image output_image_name
+Usage: ./V0 m n w patchSigma filtSigma input_image output_image_name
   m:                 height of input image
   n:                 width of input image
   w:                 patch window size
