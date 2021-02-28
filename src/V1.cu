@@ -18,10 +18,8 @@ __global__ void nonLocalMeans(double* P, int m, int n, int w, double filtSigma, 
         D = 0.0;
         for(int p = -(w-1)/2; p <= (w-1)/2; ++p) {
           for(int q = -(w-1)/2; q <= (w-1)/2; ++q) {
-            // D += pow(P[(i+p)*(n+w-1)+(j+q)] - P[(k+p)*(n+w-1)+(l+q)], 2.0);
             int temp = (P[i*n*w*w+j*w*w+(p+(w-1)/2)*w+(q+(w-1)/2)] - P[k*n*w*w+l*w*w+(p+(w-1)/2)*w+(q+(w-1)/2)]);
             D += temp*temp;
-
           }
         }
         Wxy = exp(-D/(filtSigma*filtSigma));
@@ -55,7 +53,7 @@ int main(int argc, char* argv[]) {
   }
 
   if(m != 64 && m != 128 && m != 256) {
-    printf("Only 64x64, 128x128 and 256x256 size images supported\n");
+    printf("Only 64x64, 128x128 and 256x256 image sizes supported\n");
     return 1;
   }
 
