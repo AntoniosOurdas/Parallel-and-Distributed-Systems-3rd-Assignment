@@ -2,10 +2,10 @@
 3rd Assignment for Parallel and Distibuted course of Aristotle University of Thessaloniki
 
 ### Project directories
-1. **input_images** contains images as text files in csv format given as input to the program
+1. **Execution_times** contains execution times and generated diagrams
 2. **MatlabScript** contains Matlab script used for reading output images and creating figures showing original image, image with additive gaussian noise, denoised image and residual image (difference of filtered and noisy image)
-3. **output_images** contains output images as text files in csv format given as input to the program
-4. **output_images_png** contains output images as png after matlab proccessing
+3. **input_images** contains images as text files in csv format given as input to the program
+4. **output_images** contains output images as text files both in csv format and png
 5. **src** contains source code including V0, V1, V2, utilities and Makefile
 
 ### Compilation and usage of program
