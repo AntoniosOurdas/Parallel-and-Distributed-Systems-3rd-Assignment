@@ -124,7 +124,7 @@ int main(int argc, char* argv[]) {
   double sum = 0.0;
   for(int i = 0; i < w; ++i) {
     for(int j = 0; j < w; ++j) {
-      W[i*w+j] = exp((-pow((double)(i-w/2)/(double)w, 2)-pow((double)(j-w/2)/(double)w, 2))/(2.0*patchSigma));
+      W[i*w+j] = exp((-pow((double)(i-(w-1)/2)/(double)w, 2)-pow((double)(j-(w-1)/2)/(double)w, 2))/(2.0*patchSigma));
       sum += W[i*w+j];
     }
   }
@@ -169,7 +169,8 @@ int main(int argc, char* argv[]) {
             // (p,q) is patch pixel relative to the center pixel (0,0)
             for(int p = -(w-1)/2; p <= (w-1)/2; ++p) {
               for(int q = -(w-1)/2; q <= (w-1)/2; ++q) {
-                D += W[(p+(w-1)/2)*w+(q+(w-1)/2)]*pow((X[(i+p)*(n+w-1)+(j+q)] - X[(k+p)*(n+w-1)+(l+q)]), 2.0);
+                int temp = (X[(i+p)*(n+w-1)+(j+q)] - X[(k+p)*(n+w-1)+(l+q)]);
+                D += W[(p+(w-1)/2)*w+(q+(w-1)/2)]*temp*temp;
               }
             }
             // Set weight which shows similarity
