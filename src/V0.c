@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
   }
 
   if(m != 64 && m != 128 && m != 256) {
-    printf("Only 64x64, 128x128 and 256x256 size images supported\n");
+    printf("Only 64x64, 128x128 and 256x256 image sizes supported\n");
     return 1;
   }
 
