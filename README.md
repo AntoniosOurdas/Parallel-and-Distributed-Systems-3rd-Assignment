@@ -14,10 +14,12 @@ To compile the program simply go to src directory use provided Makefile by typin
 Usage of program is show below
 
 ```
-Usage: ./V0 m n w input_image
+Usage: ./V0 m n w filtSigma patchSigma filtSigma input_image output_image_name
   m:                 height of input image
   n:                 width of input image
   w:                 patch window size
+  patchSigma:        standard deviation of gaussian kernel
+  filtSigma:         standard deviation of filter
   input_image:       input image (text file in csv format only)
   output_image_name: name for ouput image
 ```
