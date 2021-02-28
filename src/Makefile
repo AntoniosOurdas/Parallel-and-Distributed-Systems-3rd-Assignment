@@ -9,7 +9,7 @@ V1:
 	$(NVCC) V1.cu utilities.cu -o V1 $(LIBRARIES)
 
 V2:
-	$(MPICC) V2.cu utilities.cu -o V2 $(LIBRARIES)
+	$(NVCC) V2.cu utilities.cu -o V2 $(LIBRARIES)
 
 all: V0 V1 V2
 
