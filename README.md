@@ -23,4 +23,6 @@ Usage: ./V0 m n w patchSigma filtSigma input_image output_image_name
   filtSigma:         standard deviation of filter
   input_image:       input image (text file in csv format only)
   output_image_name: name for ouput image
+
+  example: ./V0 64 64 5 1.5 0.05 ../input_images/lena_64.txt lena
 ```
