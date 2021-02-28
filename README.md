@@ -1,4 +1,5 @@
 # Parallel-and-Distributed-Systems-3rd-Assignment
+#### Antonios Ourdas
 3rd Assignment for Parallel and Distibuted course of Aristotle University of Thessaloniki
 
 ### Project directories
@@ -9,7 +10,7 @@
 5. **src** contains source code including V0, V1, V2, utilities and Makefile
 
 ### Compilation and usage of program
-To compile the program simply go to src directory use provided Makefile by typing make all.
+To compile the program simply go to src directory and use provided Makefile by typing make all.
 
 Usage of program is show below
 
